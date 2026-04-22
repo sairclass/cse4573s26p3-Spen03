@@ -36,8 +36,46 @@ def detect_faces(img: torch.Tensor) -> List[List[float]]:
     
     """
     detection_results: List[List[float]] = []
+    # [[box_1], [box_2], ..., [box_n]]
 
     ##### YOUR IMPLEMENTATION STARTS HERE #####
+    # print(f'img size = {img.size}')
+    # print(f'img shape= {img.shape}')
+    # print(f'img = {img}')
+
+    # convert from [C W H] tensor to [H W C] numpy
+    rgb = img.permute(1, 2, 0).numpy()
+
+
+    # using CNN passses all tests but it is very slow
+    # face_locs = face_recognition.face_locations(img= rgb, 
+    #                                             number_of_times_to_upsample= 1,
+    #                                             model= "cnn") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+    
+    face_locs = face_recognition.face_locations(img= rgb, 
+                                                number_of_times_to_upsample= 1,
+                                                model= "hog") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+    
+    # print(f'face_locs = {face_locs}')
+
+    for box_tup in face_locs:
+        float_box_list = [float(i) for i in box_tup] # top, right, bottom, left
+        top, right, bottom, left = float_box_list
+        
+        # print(f'top {top}, right {right}, bottom {bottom}, left {left}')
+        
+        topleft_x = left # (left = 0, right = +)
+        topleft_y = top # (top = 0, bottom = +)
+
+        box_width = right - left # (left = 0, right = +)
+        box_height = bottom - top # (top = 0, bottom = +)
+
+        formatted = [topleft_x, topleft_y, box_width, box_height]
+
+        # detection_results.append(float_box_list)
+        detection_results.append(formatted)
+
+    print(f'detection_results {detection_results}')
 
     return detection_results
 
@@ -65,6 +103,16 @@ def cluster_faces(imgs: Dict[str, torch.Tensor], K: int) -> List[List[str]]:
     cluster_results: List[List[str]] = [[] for _ in range(K)] # Please make sure your output follows this data format.
         
     ##### YOUR IMPLEMENTATION STARTS HERE #####
+
+    # print(f'imgs = {imgs}')
+    my_vectors = []
+    for im_str in imgs:
+        box = detect_faces(img= imgs[im_str])
+        my_vector = face_recognition.face_encodings(face_image= imgs[im_str], known_face_locations= box)
+        my_vectors.append(my_vector)
+
+
+
     
     return cluster_results
 
@@ -75,3 +123,10 @@ But remember the above 2 functions are the only functions that will be called by
 '''
 
 # TODO: Your functions. (if needed)
+
+
+def k_means_clustering(my_data, k_clusters):
+    '''
+    cluster data into k clusters
+    '''
+    pass
