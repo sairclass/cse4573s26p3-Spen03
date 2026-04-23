@@ -42,20 +42,9 @@ def detect_faces(img: torch.Tensor) -> List[List[float]]:
     # print(f'img size = {img.size}')
     # print(f'img shape= {img.shape}')
     # print(f'img = {img}')
-
-    # convert from [C W H] tensor to [H W C] numpy
-    rgb = img.permute(1, 2, 0).numpy()
-
-
-    # using CNN passses all tests but it is very slow
-    # face_locs = face_recognition.face_locations(img= rgb, 
-    #                                             number_of_times_to_upsample= 1,
-    #                                             model= "cnn") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
     
-    face_locs = face_recognition.face_locations(img= rgb, 
-                                                number_of_times_to_upsample= 1,
-                                                model= "hog") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
-    
+    rgb = get_compatable_img(rgb_img_tensor= img) # convert img tensor to compatable numpy array
+    face_locs = get_face_boxes(rgb= rgb)
     # print(f'face_locs = {face_locs}')
 
     for box_tup in face_locs:
@@ -103,17 +92,46 @@ def cluster_faces(imgs: Dict[str, torch.Tensor], K: int) -> List[List[str]]:
     cluster_results: List[List[str]] = [[] for _ in range(K)] # Please make sure your output follows this data format.
         
     ##### YOUR IMPLEMENTATION STARTS HERE #####
-
-    # print(f'imgs = {imgs}')
-    my_vectors = []
-    for im_str in imgs:
-        box = detect_faces(img= imgs[im_str])
-        my_vector = face_recognition.face_encodings(face_image= imgs[im_str], known_face_locations= box)
-        my_vectors.append(my_vector)
-
-
-
     
+    # convert faces to encoding vectors
+    my_face_vectors = [] # face encodings to be clustered
+    my_vector_to_string = {} # the name of the image that the face encoding belongs to
+    for im_str in imgs:
+        # convert img to be compatable with face_recognition:
+        my_img = get_compatable_img(rgb_img_tensor= imgs[im_str])
+
+        box = get_face_boxes(rgb= my_img) # a list of the locations of faces in the image
+            
+        # a list of vector encodings for the faces in an image
+        face_vectors = face_recognition.face_encodings(face_image= my_img, known_face_locations= box) 
+
+        for vector in face_vectors:
+            vector = torch.from_numpy(vector)
+            my_face_vectors.append(vector)
+            my_vector_to_string[vector] = im_str
+
+    # cluster the vectors with k-means clustering
+    my_vector_clusters = k_means_clustering(my_data= my_face_vectors, k_clusters= K, epsilon= 1e-4)
+
+    # print(f'my_vector_clusters = {my_vector_clusters}')
+
+    # convert the clustered vectors into the list of filenames that belong to the vectors.
+    my_list_of_string_clusters = []
+    for vector_cluster in my_vector_clusters:
+        # print(f'vector_cluster = {vector_cluster}')
+        my_list_of_strings = []
+        for vect in vector_cluster:
+            # print(f'vect = {vect}')
+            my_string = my_vector_to_string[vect]
+            # don't append the same image to the list (identical faces in the same image like a mirror or twin)
+            if my_string not in my_list_of_strings:
+                my_list_of_strings.append(my_string) 
+            
+        my_list_of_string_clusters.append(my_list_of_strings)
+    
+    cluster_results = my_list_of_string_clusters
+
+
     return cluster_results
 
 
@@ -124,9 +142,76 @@ But remember the above 2 functions are the only functions that will be called by
 
 # TODO: Your functions. (if needed)
 
+def get_compatable_img(rgb_img_tensor):
+    # convert the tensor to a numpy array that the library wants
+    
+    # convert from [C W H] tensor to [H W C] numpy
+    return rgb_img_tensor.permute(1, 2, 0).numpy()
+    
 
-def k_means_clustering(my_data, k_clusters):
+def get_face_boxes(rgb):
+    # get face boxes the way face_recognition wants them formatted
+
+    # using CNN passses all tests but it is very slow
+    # face_locs = face_recognition.face_locations(img= rgb, 
+    #                                             number_of_times_to_upsample= 1,
+    #                                             model= "cnn") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+    
+    face_locs = face_recognition.face_locations(img= rgb, 
+                                                number_of_times_to_upsample= 1,
+                                                model= "hog") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+
+    return face_locs
+
+
+def k_means_clustering(my_data, k_clusters, epsilon=1e-4):
     '''
     cluster data into k clusters
     '''
-    pass
+    # initialize
+    rand_idxs = torch.randperm(len(my_data))[ : k_clusters]
+    centroids = [my_data[idx] for idx in rand_idxs] # list of centroids, initially random datapoints from dataset
+    converged = False
+
+    while converged == False:
+        clusters = [[] for k in range(k_clusters)]
+        
+        for point in my_data:
+            # compare the distance of a point to every centroid
+            my_centroid_idx = 0
+            min_dist = torch.nn.functional.mse_loss(input= point, target= centroids[my_centroid_idx])
+            for i in range(1, len(centroids)):
+                d = torch.nn.functional.mse_loss(input= point, target= centroids[i])
+                if d < min_dist:
+                    min_dist = d
+                    my_centroid_idx = i
+            # the centroid closest to a point now owns that point
+            clusters[my_centroid_idx].append(point)     
+        
+        # recalculate centroid positions:
+        new_centroids = []
+        within_threshold_count = 0
+        for i, cluster in enumerate(clusters):
+            # print(f'cluster{i} = {cluster}')
+            new_centroids.append(calculate_centriod(cluster_list= cluster))
+            # count how many centroids have converged
+            if torch.nn.functional.mse_loss(input= new_centroids[i], target= centroids[i]) <= epsilon:
+                within_threshold_count += 1
+
+        # if all centroids have converged, stop algorithm 
+        if within_threshold_count >= len(clusters):
+            converged = True
+            # break
+        else:
+            centroids = new_centroids # try again with updated centroids
+
+    return clusters
+
+
+
+def calculate_centriod(cluster_list):
+    # find the mean of the points in a cluster
+    # cluster_list is a list of tensors
+    cluster_tensor = torch.stack(cluster_list)
+    new_centroid_position = cluster_tensor.mean(dim=0)
+    return new_centroid_position.detach()
