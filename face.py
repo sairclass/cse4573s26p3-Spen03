@@ -44,7 +44,7 @@ def detect_faces(img: torch.Tensor) -> List[List[float]]:
     # print(f'img = {img}')
     
     rgb = get_compatable_img(rgb_img_tensor= img) # convert img tensor to compatable numpy array
-    face_locs = get_face_boxes(rgb= rgb)
+    face_locs = get_face_boxes(rgb= rgb, upsamples=1, hog= False)
     # print(f'face_locs = {face_locs}')
 
     for box_tup in face_locs:
@@ -100,7 +100,7 @@ def cluster_faces(imgs: Dict[str, torch.Tensor], K: int) -> List[List[str]]:
         # convert img to be compatable with face_recognition:
         my_img = get_compatable_img(rgb_img_tensor= imgs[im_str])
 
-        box = get_face_boxes(rgb= my_img) # a list of the locations of faces in the image
+        box = get_face_boxes(rgb= my_img, upsamples=1, hog= False) # a list of the locations of faces in the image
             
         # a list of vector encodings for the faces in an image
         face_vectors = face_recognition.face_encodings(face_image= my_img, known_face_locations= box) 
@@ -149,17 +149,25 @@ def get_compatable_img(rgb_img_tensor):
     return rgb_img_tensor.permute(1, 2, 0).numpy()
     
 
-def get_face_boxes(rgb):
+def get_face_boxes(rgb, upsamples=1, hog=True):
     # get face boxes the way face_recognition wants them formatted
 
-    # using CNN passses all tests but it is very slow
-    # face_locs = face_recognition.face_locations(img= rgb, 
-    #                                             number_of_times_to_upsample= 1,
-    #                                             model= "cnn") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+    if hog == True:
+        # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+        face_locs = face_recognition.face_locations(img= rgb, 
+                                                    number_of_times_to_upsample= upsamples,
+                                                    model= "hog") 
+    else:
+        # using CNN passses all tests but it is very slow
+        # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+        face_locs = face_recognition.face_locations(img= rgb, 
+                                                    number_of_times_to_upsample= upsamples,
+                                                    model= "cnn") 
+
     
-    face_locs = face_recognition.face_locations(img= rgb, 
-                                                number_of_times_to_upsample= 1,
-                                                model= "hog") # returns [(top, right, bottom, left), ..., (top, right, bottom, left)]
+    
+    
+    
 
     return face_locs
 
