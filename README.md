@@ -12,8 +12,8 @@ Please first update below and push your change to this repo.
 
 For the environment, you can use the project 2 setting and install face_recognition. Or use your own, there are no hard requirement about pytorch version.
 
-- Your name   
-- Your ubit name
+- Name: Spencer Jensen
+- Your ubit name: 50661967
 
 **task 1 validation set**
 
@@ -43,7 +43,7 @@ python task2.py --input_path faceCluster_5 --num_cluster 5
 Note that when packing your submission, the script would run your code before packing.
 
 ```bash
-sh pack_submission.sh <YourUBITName>
+sh pack_submission.sh sajensen
 ```
 
 * Note: In the commands, use `python3` if your environment has python named as `python3` instead `python`.
