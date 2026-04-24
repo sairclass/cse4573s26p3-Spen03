@@ -44,7 +44,7 @@ def detect_faces(img: torch.Tensor) -> List[List[float]]:
     # print(f'img = {img}')
     
     rgb = get_compatable_img(rgb_img_tensor= img) # convert img tensor to compatable numpy array
-    face_locs = get_face_boxes(rgb= rgb, upsamples=1, hog= False)
+    face_locs = get_face_boxes(rgb= rgb, upsamples=2, hog= True)
     # print(f'face_locs = {face_locs}')
 
     for box_tup in face_locs:
@@ -100,7 +100,7 @@ def cluster_faces(imgs: Dict[str, torch.Tensor], K: int) -> List[List[str]]:
         # convert img to be compatable with face_recognition:
         my_img = get_compatable_img(rgb_img_tensor= imgs[im_str])
 
-        box = get_face_boxes(rgb= my_img, upsamples=1, hog= False) # a list of the locations of faces in the image
+        box = get_face_boxes(rgb= my_img, upsamples=2, hog= True) # a list of the locations of faces in the image
             
         # a list of vector encodings for the faces in an image
         face_vectors = face_recognition.face_encodings(face_image= my_img, known_face_locations= box) 
@@ -111,7 +111,7 @@ def cluster_faces(imgs: Dict[str, torch.Tensor], K: int) -> List[List[str]]:
             my_vector_to_string[vector] = im_str
 
     # cluster the vectors with k-means clustering
-    my_vector_clusters = k_means_clustering(my_data= my_face_vectors, k_clusters= K, epsilon= 1e-4)
+    my_vector_clusters = k_means_clustering(my_data= my_face_vectors, k_clusters= K, epsilon= 1e-6)
 
     # print(f'my_vector_clusters = {my_vector_clusters}')
 
